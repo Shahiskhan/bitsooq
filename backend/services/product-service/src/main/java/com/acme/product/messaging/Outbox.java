@@ -34,22 +34,24 @@ public class Outbox {
                 "aggregateId", orderId, "occurredAt", Instant.now().toString(), "payload", payload));
         jdbc.update("INSERT INTO outbox(event_id, aggregate_id, payload) VALUES(?,?,?)", eventId, orderId, envelope);
     }
-    private record Pending(String eventId, String aggregateId, String payload) {}
+    private record Pending(String eventId,String aggregateId,String payload) {}
     @Scheduled(fixedDelayString="${commerce.outbox-delay-ms:500}")
     @Transactional(timeout=25)
     public void publishOne() {
-        var pending = jdbc.query("SELECT event_id,aggregate_id,payload FROM outbox WHERE published_at IS NULL ORDER BY created_at,event_id LIMIT 1 FOR UPDATE SKIP LOCKED",
-                (rs, row) -> new Pending(rs.getString(1), rs.getString(2), rs.getString(3)));
-        if (pending.isEmpty()) return;
-        var event = pending.getFirst();
-        try {
-            kafka.send(topic, event.aggregateId(), event.payload()).get(20, TimeUnit.SECONDS);
-            jdbc.update("UPDATE outbox SET published_at=? WHERE event_id=?", Timestamp.from(Instant.now()), event.eventId());
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            log.warn("outbox_publish_interrupted eventId={}", event.eventId());
-        } catch (Exception unavailable) {
-            log.warn("outbox_publish_pending eventId={} errorType={}", event.eventId(), unavailable.getClass().getSimpleName());
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);
+        var rows=jdbc.query("SELECT event_id,aggregate_id,payload FROM outbox WHERE published_at IS NULL ORDER BY created_at,event_id LIMIT 25 FOR UPDATE SKIP LOCKED",(rs,n)->new Pending(rs.getString(1),rs.getString(2),rs.getString(3)));
+        record Sending(String id,java.util.concurrent.CompletableFuture<org.springframework.kafka.support.SendResult<String,String>> future){}
+        var sending=new java.util.ArrayList<Sending>();
+        for(var row:rows){
+            if(System.nanoTime()>=deadline)break;
+            try{sending.add(new Sending(row.eventId(),kafka.send(topic,row.aggregateId(),row.payload())));}
+            catch(Exception unavailable){log.warn("outbox_enqueue_pending eventId={} errorType={}",row.eventId(),unavailable.getClass().getSimpleName());break;}
+        }
+        for(var message:sending){
+            long remaining=deadline-System.nanoTime();if(remaining<=0)break;
+            try{message.future().get(remaining,TimeUnit.NANOSECONDS);jdbc.update("UPDATE outbox SET published_at=? WHERE event_id=?",Timestamp.from(Instant.now()),message.id());}
+            catch(InterruptedException interrupted){Thread.currentThread().interrupt();log.warn("outbox_publish_interrupted eventId={}",message.id());break;}
+            catch(Exception unavailable){log.warn("outbox_publish_pending eventId={} errorType={}",message.id(),unavailable.getClass().getSimpleName());}
         }
     }
 }

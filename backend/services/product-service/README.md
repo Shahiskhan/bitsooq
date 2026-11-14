@@ -26,3 +26,13 @@ Outbox publisher locks one pending row using MySQL `FOR UPDATE SKIP LOCKED`, wai
 ## Verification and production work
 
 Tests cover authoritative money calculation, expiry, overflow, duplicate events, compensation, terminal ordering, rollback of inbox/domain/outbox, concurrent competing orders and signed-context spoofing. JDBC tests use H2 MySQL mode; production acceptance additionally needs real MySQL/Kafka/Redis integration tests, load testing, fault injection, broker ACLs, encrypted transport, database backups and tested restoration, inventory replenishment/returns APIs and saga reconciliation tooling.
+
+## Catalog administration
+
+Gateway-signed STAFF or SUPER_ADMIN context is required for all catalog writes and /api/admin/products reads. Legacy ADMIN is translated to STAFF at the edge. Public catalog/category GET requests may carry ANONYMOUS context. Product responses now include categoryId, version and active. Metadata PUT /api/products/{sku} requires expectedVersion; DELETE with expectedVersion archives the row without breaking historical reservations. Archived SKUs cannot enter a new reservation.
+
+Categories use GET/POST /api/categories and PUT /api/categories/{id}; the update contains name, expectedVersion and active. Product creation accepts optional categoryId; it must reference an active category. V2 migrations preserve existing V1 data and add administration tables/indexes.
+
+POST /api/products/{sku}/stock requires Idempotency-Key and {delta,expectedVersion,reason}. The transaction locks the SKU, checks the current version, prevents negative availability and a physical total over one billion units (including outstanding reservations), increments the version, and persists actor/key/request hash/result in stock_adjustment. A repeated key returns the original result; another request body with the same actor/key returns409. Use a fresh key after explicitly refreshing a stale version. Saga reservation/release also increments version so a stock editor cannot overwrite concurrent checkout changes.
+
+GET /api/admin/products?after=SKU&size=20 includes archived products and reads authoritative SQL; storefront catalog reads remain cached for30 seconds. The outbox worker sends a bounded25-row batch and uses one15-second acknowledgement deadline within a25-second transaction. Only acknowledged rows are marked.

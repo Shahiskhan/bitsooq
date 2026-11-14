@@ -27,7 +27,9 @@ class GatewayContextTest {
 
     @Test void wiresSecurityCircuitBreakersRateLimiterAndExplicitRoutes() {
         assertThat(routes.getRoutes().map(route -> route.getId()).collectList().block(Duration.ofSeconds(10)))
-                .containsExactlyInAnyOrder("users", "products", "orders", "notifications");
+                .containsExactlyInAnyOrder("admin-users", "users", "products", "orders", "notifications", "payments");
+        assertThat(routes.getRoutes().filter(route -> route.getId().equals("admin-users")).next().block(Duration.ofSeconds(10)).getMetadata())
+                .containsEntry("response-timeout", 20000);
         assertThat(limiter).isNotNull();
         assertThat(security).isNotNull();
     }

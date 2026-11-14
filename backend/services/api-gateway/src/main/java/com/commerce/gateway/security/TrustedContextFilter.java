@@ -19,36 +19,30 @@ import reactor.core.publisher.Mono;
 @Component
 public final class TrustedContextFilter implements GlobalFilter, Ordered {
     private final InternalContextSigner signer;
-
+    private record Identity(String user, String roles) { }
     public TrustedContextFilter(@Value("${security.internal.secret}") String secret) { signer = new InternalContextSigner(secret); }
 
     @Override public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        return exchange.getPrincipal().ofType(Authentication.class)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED)))
-                .flatMap(principal -> {
-            String user = principal.getName();
-            String roles = principal.getAuthorities().stream().map(authority -> authority.getAuthority())
-                    .filter(role -> role.startsWith("ROLE_")).map(role -> role.substring(5)).sorted().distinct()
-                    .reduce((left, right) -> left + "," + right).orElse("USER");
+        Mono<Identity> identity = exchange.getPrincipal().ofType(Authentication.class).filter(Authentication::isAuthenticated)
+                .map(principal -> new Identity(principal.getName(), principal.getAuthorities().stream()
+                        .map(authority -> authority.getAuthority()).filter(role -> role.startsWith("ROLE_"))
+                        .map(role -> role.substring(5)).sorted().distinct().reduce((left, right) -> left + "," + right).orElse("USER")));
+        if (CatalogAccess.isPublicRead(exchange)) identity = identity.defaultIfEmpty(new Identity("anonymous", "ANONYMOUS"));
+        return identity.switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED))).flatMap(context -> {
             String timestamp = Long.toString(Instant.now().getEpochSecond());
             String requestId = exchange.getAttributeOrDefault(RequestCorrelationFilter.REQUEST_ID_ATTRIBUTE, UUID.randomUUID().toString());
-            String signature = signer.sign(exchange.getRequest().getMethod().name(),
-                    exchange.getRequest().getURI().getRawPath(), user, roles, timestamp, requestId);
+            String signature = signer.sign(exchange.getRequest().getMethod().name(), exchange.getRequest().getURI().getRawPath(),
+                    context.user(), context.roles(), timestamp, requestId);
             return chain.filter(exchange.mutate().request(request -> request.headers(headers -> {
-                new ArrayList<>(headers.headerNames()).stream()
-                        .filter(name -> name.toLowerCase(Locale.ROOT).startsWith("x-internal-"))
-                        .forEach(headers::remove);
+                new ArrayList<>(headers.headerNames()).stream().filter(name -> name.toLowerCase(Locale.ROOT).startsWith("x-internal-")).forEach(headers::remove);
                 headers.remove(HttpHeaders.AUTHORIZATION);
-                headers.set("X-Internal-User-Id", user);
-                headers.set("X-Internal-Roles", roles);
+                headers.set("X-Internal-User-Id", context.user());
+                headers.set("X-Internal-Roles", context.roles());
                 headers.set("X-Internal-Timestamp", timestamp);
                 headers.set("X-Internal-Request-Id", requestId);
                 headers.set("X-Internal-Signature", signature);
             })).build());
         });
     }
-
     @Override public int getOrder() { return -10; }
 }
-
-

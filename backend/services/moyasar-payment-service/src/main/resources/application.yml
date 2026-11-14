@@ -1,0 +1,61 @@
+server:
+  port: 8084
+spring:
+  application:
+    name: moyasar-payment-service
+  config:
+    import: ${CONFIG_IMPORT:configserver:${CONFIG_SERVER_URL:http://config-server:8888}}
+  cloud:
+    config:
+      username: ${CONFIG_USERNAME}
+      password: ${CONFIG_PASSWORD}
+      fail-fast: true
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    validate-migration-naming: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.springframework.kafka.support.serializer.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.StringSerializer
+      acks: all
+    consumer:
+      group-id: moyasar-payment-service
+      key-deserializer: org.springframework.kafka.support.serializer.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.StringDeserializer
+bitsooq:
+  moyasar:
+    base-url: ${MOYASAR_BASE_URL:https://api.moyasar.com/v1}
+    secret-key: ${MOYASAR_SECRET_KEY:}
+    webhook-secret: ${MOYASAR_WEBHOOK_SECRET:}
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${HOSTNAME:localhost}:${server.port}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+logging:
+  structured:
+    format:
+      console: logstash
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs

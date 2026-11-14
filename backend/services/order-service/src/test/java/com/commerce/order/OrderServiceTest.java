@@ -20,7 +20,8 @@ class OrderServiceTest {
         var source=new DriverManagerDataSource("jdbc:h2:mem:"+UUID.randomUUID()+";MODE=MySQL;DB_CLOSE_DELAY=-1","sa","");
         String schema=new ClassPathResource("db/migration/V1__order_domain.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8)
                 .replace(" DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin","");
-        new ResourceDatabasePopulator(new org.springframework.core.io.ByteArrayResource(schema.getBytes(java.nio.charset.StandardCharsets.UTF_8))).execute(source);
+        String paymentRefs=new ClassPathResource("db/migration/V2__payment_references.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        new ResourceDatabasePopulator(new org.springframework.core.io.ByteArrayResource((schema+"\n"+paymentRefs).getBytes(java.nio.charset.StandardCharsets.UTF_8))).execute(source);
         db=new JdbcTemplate(source);
         service=new OrderService(db,new TransactionTemplate(new DataSourceTransactionManager(source)),json,Duration.ofMinutes(15));
     }

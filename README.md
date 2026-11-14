@@ -1,16 +1,40 @@
-# Commerce — modern storefront + distributed backend
-A responsive commerce frontend lives in `frontend/`; the independently buildable Spring Boot platform is isolated in `backend/`.
+# BitSooq commerce platform
 
-## Frontend
+BitSooq is a bilingual storefront and Spring Boot commerce platform. The storefront has a lightweight sample-data mode; the backend is split into services for catalog/inventory, customers, orders, payments, and notifications.
+
+## Run the storefront without the backend
+
+This is the low-resource path. It starts only Vite and uses a clearly labelled PKR sample catalog. Checkout previews Lahore/Karachi/Islamabad/Rawalpindi/Faisalabad standard and express delivery, address instructions and optional GPS pin, then stores a demo order/tracking timeline in this browser. It does not contact a payment provider, courier, or backend.
+
 ```powershell
-Set-Location frontend
+cd bitsooq-ui
 npm install
-npm run dev
+npm run dev:demo
 ```
 
-The backend environment helper creates `frontend/.env.local`; set `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_API_BASE_URL` there. Firebase sign-in is intentionally required: the API gateway verifies Firebase ID tokens and does not provide a local auth bypass. The app provides a polished catalog experience, search/filter controls, basket persistence, Firebase sign-in, and authenticated checkout/order status. Product browsing works in demo preview without API configuration; protected operations require backend + Firebase configuration.
+Open the local URL Vite prints. For a small Docker preview on port 3000, run from the repository root:
 
-## Backend
-See [`backend/README.md`](backend/README.md) for local Docker Compose startup and independent service verification. Compose files, scripts, source services, config, contracts, and operational docs are all contained in `backend/`.
+```powershell
+docker compose -f docker-compose.slim.yml up --build
+```
 
-This repository is an implementation foundation, not a claim of production-grade availability or hyper-scale. Review [`backend/docs/operations.md`](backend/docs/operations.md) before any production deployment: provider-backed payments, HA infrastructure, backups/restores, TLS/mTLS, integration/failure/load testing, and monitoring/incident runbooks remain required.
+## Optional local MySQL
+
+To develop service migrations on one MySQL server, copy the optional root password into `.env`, then start the database:
+
+```powershell
+docker compose --env-file .env -f docker-compose.mysql-dev.yml up -d
+```
+
+It creates separate logical databases (`user`, `product`, `order`, `payment`, `notification`, `moyasar`, and `crypto`) on one local MySQL 8.4 instance at `127.0.0.1:3307`. The database users and passwords in its init script are local-development credentials; do not reuse them outside this isolated setup. A running database alone does not start any Java service.
+
+## Full backend
+
+See [`backend/README.md`](backend/README.md) for the complete Docker Compose stack, service configuration, and verification commands. You do not need to run that stack to browse the sample storefront.
+
+## Domain and deployment notes
+
+- [`docs/ecommerce-domain.md`](docs/ecommerce-domain.md) describes the expanded catalog, order, tax, fulfillment, customer-address, and payment data model and its migration boundaries.
+- [`backend/docs/operations.md`](backend/docs/operations.md) lists production readiness work. The repository contains integration seams and schemas; it does not claim live Pakistan tax filing, live COD, shipping-carrier, JazzCash/Easypaisa, or production payment processing is configured.
+
+The live API supports customer address book, delivery-zone quotes, configurable delivery rates, order address snapshots, COD due/collection, staff shipment milestones, tracking references, ETA, and shipment activity. Delivery zones and rates must be configured by staff before live checkout can quote delivery. Live catalog/order currency remains USD; local demo prices/rates are PKR examples and never submit real orders. No carrier account or automatic courier booking/label purchase is configured. Moyasar requires valid provider credentials and callbacks; crypto remains disabled by default. Never use sample catalog data or local credentials for real orders.

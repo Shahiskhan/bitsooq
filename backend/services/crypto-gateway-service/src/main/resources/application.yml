@@ -1,0 +1,69 @@
+server:
+  port: ${PORT:8087}
+  shutdown: graceful
+spring:
+  application:
+    name: crypto-gateway-service
+  config:
+    import: ${CONFIG_IMPORT:configserver:${CONFIG_SERVER_URL:http://localhost:8888}}
+  cloud:
+    config:
+      username: ${CONFIG_USERNAME}
+      password: ${CONFIG_PASSWORD}
+      fail-fast: true
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 2000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+  flyway:
+    enabled: true
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL}
+  instance:
+    prefer-ip-address: true
+security:
+  internal-hmac-secret: ${INTERNAL_HMAC_SECRET}
+crypto:
+  rpc-url: ${CRYPTO_RPC_URL}
+  merchant-wallet: ${CRYPTO_MERCHANT_WALLET}
+  beta-enabled: ${CRYPTO_BETA_ENABLED:false}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+logging:
+  structured:
+    format:
+      console: logstash
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs

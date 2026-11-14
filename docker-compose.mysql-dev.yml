@@ -1,0 +1,26 @@
+name: commerce-mysql-dev
+# One local MySQL server with a separate logical database for every owning service.
+# This is a development convenience; production should use isolated credentials and database services.
+services:
+  mysql-dev:
+    image: mysql:8.4
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_0900_bin]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${COMMERCE_DEV_DB_ROOT_PASSWORD:?Set COMMERCE_DEV_DB_ROOT_PASSWORD in the root .env file}
+    ports:
+      - 127.0.0.1:3307:3306
+    volumes:
+      - commerce-mysql-dev-data:/var/lib/mysql
+      - ./backend/dev/mysql/init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -uroot -e "SELECT 1"']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+volumes:
+  commerce-mysql-dev-data: {}

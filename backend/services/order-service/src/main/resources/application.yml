@@ -64,3 +64,10 @@ commerce:
   internal-secret: ${INTERNAL_HMAC_SECRET}
   topic: commerce.saga.v1
   order-lifetime: PT15M
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs

@@ -1,0 +1,23 @@
+CREATE DATABASE IF NOT EXISTS `user` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `product` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `order` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `payment` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `notification` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `moyasar` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE DATABASE IF NOT EXISTS `crypto` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+
+CREATE USER IF NOT EXISTS 'user'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'product'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'order'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'payment'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'notification'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'moyasar'@'%' IDENTIFIED BY 'local_dev_only';
+CREATE USER IF NOT EXISTS 'crypto'@'%' IDENTIFIED BY 'local_dev_only';
+
+GRANT ALL PRIVILEGES ON `user`.* TO 'user'@'%';
+GRANT ALL PRIVILEGES ON `product`.* TO 'product'@'%';
+GRANT ALL PRIVILEGES ON `order`.* TO 'order'@'%';
+GRANT ALL PRIVILEGES ON `payment`.* TO 'payment'@'%';
+GRANT ALL PRIVILEGES ON `notification`.* TO 'notification'@'%';
+GRANT ALL PRIVILEGES ON `moyasar`.* TO 'moyasar'@'%';
+GRANT ALL PRIVILEGES ON `crypto`.* TO 'crypto'@'%';
