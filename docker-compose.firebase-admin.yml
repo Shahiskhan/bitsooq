@@ -1,0 +1,13 @@
+# Optional privileged Firebase account-management capability; JSON key is never baked into images.
+services:
+  user-service:
+    environment:
+      FIREBASE_ADMIN_ENABLED: 'true'
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
+    volumes:
+      - type: bind
+        source: ${FIREBASE_ADMIN_CREDENTIALS_FILE:?Set absolute path to Firebase admin service-account JSON}
+        target: /run/secrets/firebase-admin.json
+        read_only: true
+        bind:
+          create_host_path: false

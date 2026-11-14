@@ -62,6 +62,7 @@ public final class InternalContextFilter extends OncePerRequestFilter {
             response.getWriter().write("{\"title\":\"Untrusted internal context\",\"status\":401}"); return;
         }
         request.setAttribute("userId", user);
+        request.setAttribute("roles", roles);
         MDC.put("requestId", id);
         try { chain.doFilter(request, response); } finally { MDC.remove("requestId"); }
     }

@@ -77,3 +77,10 @@ logging:
 commerce:
   internal-hmac-secret: ${INTERNAL_HMAC_SECRET}
   saga-topic: commerce.saga.v1
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs

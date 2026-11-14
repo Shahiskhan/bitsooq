@@ -34,6 +34,25 @@ class TrustedContextFilterTest {
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
+    @Test void anonymousCatalogGetsSignedAnonymousIdentityWithoutSpoofedRoles() {
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/products")
+                .header("X-Internal-User-Id", "superuser").header("X-Internal-Roles", "SUPER_ADMIN"));
+        AtomicReference<ServerWebExchange> captured = new AtomicReference<>();
+        new TrustedContextFilter(SECRET).filter(exchange, next -> { captured.set(next); return Mono.empty(); }).block();
+        assertThat(captured.get().getRequest().getHeaders().getFirst("X-Internal-User-Id")).isEqualTo("anonymous");
+        assertThat(captured.get().getRequest().getHeaders().getFirst("X-Internal-Roles")).isEqualTo("ANONYMOUS");
+        assertThat(captured.get().getRequest().getHeaders().getFirst("X-Internal-Signature")).isNotBlank();
+    }
+    @Test void anonymousIdentityCannotBeUsedOnProtectedOrLookalikePath() {
+        for (String path : List.of("/api/orders", "/api/products-admin", "/api/admin/products")) {
+            var exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path));
+            assertThatThrownBy(() -> new TrustedContextFilter(SECRET).filter(exchange, next -> Mono.empty()).block())
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        }
+        var write = MockServerWebExchange.from(MockServerHttpRequest.post("/api/products"));
+        assertThatThrownBy(() -> new TrustedContextFilter(SECRET).filter(write, next -> Mono.empty()).block())
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
     @Test void matchesIndependentDotNetInteroperabilityFixture() {
         assertThat(new InternalContextSigner(SECRET).sign("POST", "/api/orders", "customer-123", "ADMIN,USER",
                 "1792972800", "00000000-0000-0000-0000-000000000001"))

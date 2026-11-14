@@ -1,0 +1,27 @@
+name: bitsooq-preview
+# Lightweight storefront preview. No Java services, broker, cache or database are started.
+services:
+  storefront:
+    build:
+      context: ./bitsooq-ui
+      args:
+        VITE_USE_MOCK: 'true'
+    ports:
+      - 127.0.0.1:3000:8080
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

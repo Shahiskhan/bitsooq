@@ -29,7 +29,7 @@ class InventorySagaTest {
     @BeforeEach void setup() {
         var ds = new JdbcDataSource();
         ds.setURL("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000");
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__catalog_inventory_and_delivery.sql")).execute(ds);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__catalog_inventory_and_delivery.sql"), new ClassPathResource("db/migration/V2__catalog_administration.sql")).execute(ds);
         jdbc = new JdbcTemplate(ds);
         tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
         var outbox = new Outbox(jdbc, json, mock(KafkaTemplate.class), "commerce.saga.v1");

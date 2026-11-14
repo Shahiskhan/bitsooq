@@ -86,9 +86,11 @@ services:
     environment:
       <<: *env
       DB_URL: jdbc:mysql://user-db:3306/user?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&connectTimeout=2000&socketTimeout=5000
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Set FIREBASE_PROJECT_ID in .env}
+      FIREBASE_ADMIN_ENABLED: ${FIREBASE_ADMIN_ENABLED:-false}
       DB_USERNAME: user
       DB_PASSWORD: ${USER_DB_PASSWORD:?Set USER_DB_PASSWORD in .env}
-    networks: [services, user-data]
+    networks: [edge, services, user-data]
     depends_on:
       config-server: {condition: service_healthy}
       discovery-server: {condition: service_healthy}
@@ -220,6 +222,70 @@ services:
       timeout: 5s
       retries: 12
       start_period: 90s
+  moyasar-payment-service:
+    <<: *app
+    build: ./services/moyasar-payment-service
+    environment:
+      <<: *env
+      DB_URL: jdbc:mysql://moyasar-db:3306/moyasar?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&connectTimeout=2000&socketTimeout=5000
+      DB_USERNAME: moyasar
+      DB_PASSWORD: ${MOYASAR_DB_PASSWORD:?Set MOYASAR_DB_PASSWORD in .env}
+      MOYASAR_BASE_URL: ${MOYASAR_BASE_URL:-https://api.moyasar.com/v1}
+      MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY:?Set MOYASAR_SECRET_KEY in .env}
+      MOYASAR_WEBHOOK_SECRET: ${MOYASAR_WEBHOOK_SECRET:-}
+    networks: [services, moyasar-data]
+    depends_on:
+      config-server: {condition: service_healthy}
+      discovery-server: {condition: service_healthy}
+      moyasar-db: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8084/actuator/health]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+  moyasar-db:
+    <<: *mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: moyasar
+      MYSQL_USER: moyasar
+      MYSQL_PASSWORD: ${MOYASAR_DB_PASSWORD:?Set MOYASAR_DB_PASSWORD in .env}
+    volumes: [moyasar-db-data:/var/lib/mysql]
+    networks: [moyasar-data]
+  crypto-gateway-service:
+    <<: *app
+    build: ./services/crypto-gateway-service
+    environment:
+      <<: *env
+      DB_URL: jdbc:mysql://crypto-db:3306/crypto?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&connectTimeout=2000&socketTimeout=5000
+      DB_USERNAME: crypto
+      DB_PASSWORD: ${CRYPTO_DB_PASSWORD:?Set CRYPTO_DB_PASSWORD in .env}
+      CRYPTO_RPC_URL: ${CRYPTO_RPC_URL:?Set CRYPTO_RPC_URL in .env}
+      CRYPTO_MERCHANT_WALLET: ${CRYPTO_MERCHANT_WALLET:?Set CRYPTO_MERCHANT_WALLET in .env}
+      CRYPTO_BETA_ENABLED: ${CRYPTO_BETA_ENABLED:-false}
+    networks: [services, crypto-data]
+    depends_on:
+      config-server: {condition: service_healthy}
+      discovery-server: {condition: service_healthy}
+      crypto-db: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8087/actuator/health]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+  crypto-db:
+    <<: *mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: crypto
+      MYSQL_USER: crypto
+      MYSQL_PASSWORD: ${CRYPTO_DB_PASSWORD:?Set CRYPTO_DB_PASSWORD in .env}
+    volumes: [crypto-db-data:/var/lib/mysql]
+    networks: [crypto-data]
   notification-db:
     <<: *mysql
     environment:
@@ -309,12 +375,16 @@ networks:
   order-data: {internal: true}
   payment-data: {internal: true}
   notification-data: {internal: true}
+  moyasar-data: {internal: true}
+  crypto-data: {internal: true}
 volumes:
   user-db-data: {}
   product-db-data: {}
   order-db-data: {}
   payment-db-data: {}
   notification-db-data: {}
+  moyasar-db-data: {}
+  crypto-db-data: {}
   kafka-data: {}
   edge-redis-data: {}
   product-redis-data: {}

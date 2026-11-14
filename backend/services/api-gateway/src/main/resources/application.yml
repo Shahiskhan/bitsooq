@@ -66,6 +66,9 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 5
         wait-duration-in-open-state: 10s
   timelimiter:
+    instances:
+      adminUsers:
+        timeout-duration: 25s
     configs:
       default:
         timeout-duration: 5s
@@ -84,3 +87,10 @@ logging:
     format:
       console: logstash
 
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs

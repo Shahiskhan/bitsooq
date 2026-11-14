@@ -21,9 +21,12 @@ public class ProductController {
     public ProductController(CatalogService catalog) { this.catalog = catalog; }
     public record CreateProduct(@NotBlank @Pattern(regexp="[A-Z0-9_-]{1,64}") String sku,
                                 @NotBlank @Size(max=200) String name,
+                                @Size(max=200) String nameAr,
+                                @Size(max=2000) String descriptionEn,
+                                @Size(max=2000) String descriptionAr,
                                 @Min(1) @Max(1_000_000_000_000L) long priceMinor,
                                 @NotNull @Pattern(regexp="USD") String currency,
-                                @Min(0) @Max(1_000_000_000) int stock) {}
+                                @Min(0) @Max(1_000_000_000) int stock, @Pattern(regexp="[A-Z0-9_-]{1,64}") String categoryId) {}
     @GetMapping
     public List<Product> list(@RequestParam(defaultValue="") @Pattern(regexp="[A-Z0-9_-]{0,64}") String after,
                               @RequestParam(defaultValue="20") @Min(1) @Max(100) int size) { return catalog.list(after, size); }
@@ -34,8 +37,7 @@ public class ProductController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Product create(@Valid @RequestBody CreateProduct request, HttpServletRequest servlet) {
-        Object roles = servlet.getAttribute("authenticatedRoles");
-        if (roles == null || !Arrays.asList(roles.toString().split(",")).contains("ADMIN")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator role required");
-        return catalog.create(new Product(request.sku(), request.name(), request.priceMinor(), request.currency(), request.stock()));
+        com.acme.product.security.AdminAccess.requireStaff(servlet);
+        return catalog.create(new Product(request.sku(), request.name(), request.nameAr(), request.descriptionEn(), request.descriptionAr(), request.priceMinor(), request.currency(), request.stock(), request.categoryId(), 0, true));
     }
 }

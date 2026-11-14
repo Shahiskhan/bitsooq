@@ -48,7 +48,7 @@ public class InventorySaga {
         Map<String, Product> products = new HashMap<>();
         // Stable lock order bounds deadlocks for simultaneous overlapping baskets.
         for (String sku : items.stream().map(InventoryPlan.Item::sku).distinct().sorted().toList()) {
-            var found = jdbc.query("SELECT * FROM product WHERE sku=? FOR UPDATE", CatalogService.PRODUCT_MAPPER, sku);
+            var found = jdbc.query("SELECT * FROM product WHERE sku=? AND active=TRUE FOR UPDATE", CatalogService.PRODUCT_MAPPER, sku);
             if (!found.isEmpty()) products.put(sku, found.getFirst());
         }
         InventoryPlan plan;
@@ -59,7 +59,7 @@ public class InventorySaga {
             return;
         }
         for (var line : plan.lines()) {
-            int updated = jdbc.update("UPDATE product SET available_stock=available_stock-? WHERE sku=? AND available_stock>=?", line.quantity(), line.sku(), line.quantity());
+            int updated = jdbc.update("UPDATE product SET available_stock=available_stock-?, version=version+1 WHERE sku=? AND available_stock>=?", line.quantity(), line.sku(), line.quantity());
             if (updated != 1) throw new IllegalStateException("Stock invariant violated");
             jdbc.update("INSERT INTO reservation_item(order_id,sku,quantity,unit_price_minor) VALUES(?,?,?,?)", orderId, line.sku(), line.quantity(), line.unitPriceMinor());
         }
@@ -95,7 +95,7 @@ public class InventorySaga {
             var lines = jdbc.query("SELECT sku,quantity FROM reservation_item WHERE order_id=? ORDER BY sku", (rs, row) -> new ReservedItem(rs.getString(1), rs.getInt(2)), orderId);
             for (var line : lines) {
                 jdbc.queryForObject("SELECT available_stock FROM product WHERE sku=? FOR UPDATE", Integer.class, line.sku());
-                jdbc.update("UPDATE product SET available_stock=available_stock+? WHERE sku=?", line.quantity(), line.sku());
+                jdbc.update("UPDATE product SET available_stock=available_stock+?, version=version+1 WHERE sku=?", line.quantity(), line.sku());
             }
             catalog.evictAfterCommit(lines.stream().map(ReservedItem::sku).toList());
         }

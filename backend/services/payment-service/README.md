@@ -11,3 +11,7 @@ The outbox acknowledges Kafka before marking its SQL row published, so delivery 
 Required environment: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `CONFIG_SERVER_URL`, `CONFIG_USERNAME`, `CONFIG_PASSWORD`, `EUREKA_URL`, `KAFKA_BOOTSTRAP_SERVERS`, `INTERNAL_HMAC_SECRET`, `SPRING_PROFILES_ACTIVE=local`, `PAYMENT_PROVIDER=sandbox`. Port 8084. Internal signed-header verification matches the gateway; production also requires mTLS and network isolation. Only health/probes are readable without signed identity.
 
 Tests cover repeated physical and logical events, an expired reservation that never reaches the provider, rollback/retry after an unknown result, and internal-header signatures. H2 unit tests do not establish real MySQL concurrency or Kafka failure behavior.
+
+## Payment status API
+
+GET /api/payments/orders/{orderId} returns {orderId,paymentId,totalMinor,currency,status,createdAt} only when the gateway-signed UID owns the payment. Unknown records and another customer's records both return404. Creation and authorization remain driven by the inventory event, so clients cannot submit their own amount or directly mark a payment successful. No raw card data or provider secrets are exposed. The local sandbox remains explicit and fails closed outside its exact local profile.
