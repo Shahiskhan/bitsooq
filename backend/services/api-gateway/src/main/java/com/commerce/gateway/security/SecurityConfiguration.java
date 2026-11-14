@@ -63,7 +63,7 @@ public class SecurityConfiguration {
                 .authorizeExchange(auth -> auth.pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
                         .pathMatchers("/api/admin/users/**", "/api/admin/analytics/**").hasRole("SUPER_ADMIN")
-                        .pathMatchers("/api/admin/orders/**", "/api/admin/products/**", "/api/admin/categories/**", "/api/admin/delivery/**", "/api/admin/shipments/**").hasAnyRole("STAFF", "SUPER_ADMIN")
+                        .pathMatchers("/api/admin/orders/**", "/api/admin/products/**", "/api/admin/categories/**", "/api/admin/sellers/**", "/api/admin/delivery/**", "/api/admin/shipments/**").hasAnyRole("STAFF", "SUPER_ADMIN")
                         .pathMatchers("/api/products/**", "/api/categories/**").hasAnyRole("STAFF", "SUPER_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/payments/orders/**").authenticated()
                         // Moyasar webhook: unauthenticated by design; verification happens via an

@@ -40,6 +40,7 @@ export interface Product {
   availableStock: number;
   categoryId?: string | null;
   active: boolean;
+  version?: number;
   slug?: string;
   brandName?: string;
   sellerName?: string;
@@ -87,6 +88,39 @@ export interface OrderSummary {
 export interface OrderPage {
   items: OrderSummary[];
   nextCursor: string | null;
+}
+
+export interface AdminAnalytics {
+  totalOrders: number;
+  pendingOrders: number;
+  reservedOrders: number;
+  confirmedOrders: number;
+  cancelledOrders: number;
+  confirmedRevenueMinor: number;
+  currency: string;
+}
+
+export interface AdminUser {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  disabled: boolean;
+  roles: string[];
+}
+
+export interface Seller {
+  id: string;
+  ownerUserId: string;
+  displayName: string;
+  legalName?: string | null;
+  slug: string;
+  email?: string | null;
+  phone?: string | null;
+  countryCode: string;
+  taxRegistrationNumber?: string | null;
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ShippingAddress {
@@ -180,9 +214,16 @@ export interface MoyasarIntent {
 // ---- Catalog (public) ----
 export const getProducts = () => request<Product[]>('/api/products');
 export const getCategories = () => request<Category[]>('/api/categories');
+export const getAdminProducts = () => request<Product[]>('/api/admin/products?size=100');
 
 // ---- Orders ----
 export const getOrders = (after?: string) => request<OrderPage>(`/api/orders?size=20${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+export const getAdminOrders = (after?: string, status?: string) => request<OrderPage>(`/api/admin/orders?size=20${after ? `&after=${encodeURIComponent(after)}` : ''}${status ? `&status=${encodeURIComponent(status)}` : ''}`);
+export interface AdminOrderDetail extends OrderSummary { items: Array<{ sku: string; quantity: number }> }
+export const getAdminOrder = (id: string) => request<AdminOrderDetail>(`/api/admin/orders/${encodeURIComponent(id)}`);
+export const getAdminAnalytics = () => request<AdminAnalytics>('/api/admin/analytics/orders');
+export const getAdminUsers = (cursor?: string) => request<{ users: AdminUser[]; nextCursor: string | null }>(`/api/admin/users?size=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+export const updateAdminUserRoles = (uid: string, roles: string[]) => request<{ uid: string; roles: string[] }>(`/api/admin/users/${encodeURIComponent(uid)}/roles`, { method: 'PUT', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ roles }) });
 export const getOrder = (id: string) => request<Order>(`/api/orders/${id}`);
 export const createOrder = (items: Record<string, number>, shippingAddress?: ShippingAddress, deliveryRateId?: string, paymentMethod = 'MOYASAR', idempotencyKey = crypto.randomUUID()) =>
   request<Order>('/api/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({
@@ -202,17 +243,23 @@ export const archiveAddress = (id: string, expectedVersion: number) =>
   request<void>(`/api/users/me/addresses/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE' });
 export const getDeliveryZones = () => request<DeliveryZone[]>('/api/admin/delivery/zones');
 export const getDeliveryRates = () => request<DeliveryRate[]>('/api/admin/delivery/rates');
+export const createAdminCategory = (category: Pick<Category, 'id' | 'name'>) => request<Category>('/api/categories', { method: 'POST', body: JSON.stringify(category) });
 export const createDeliveryZone = (zone: Omit<DeliveryZone, 'id'|'active'>) => request<DeliveryZone>('/api/admin/delivery/zones', { method: 'POST', body: JSON.stringify(zone) });
 export const createDeliveryRate = (zoneId: string, rate: Pick<DeliveryRate, 'methodCode'|'methodName'|'feeMinor'|'currency'|'minDeliveryDays'|'maxDeliveryDays'|'supportsCod'>) =>
   request<DeliveryRate>(`/api/admin/delivery/zones/${encodeURIComponent(zoneId)}/rates`, { method: 'POST', body: JSON.stringify(rate) });
 export const setDeliveryZoneActive = (id: string, active: boolean) => request<DeliveryZone>(`/api/admin/delivery/zones/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ active }) });
 export const setDeliveryRateActive = (id: string, active: boolean) => request<DeliveryRate>(`/api/admin/delivery/rates/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ active }) });
+export const getAdminSellers = () => request<Seller[]>('/api/admin/sellers?size=100');
+export const createAdminSeller = (seller: Omit<Seller, 'id' | 'status' | 'createdAt' | 'updatedAt'>) => request<Seller>('/api/admin/sellers', { method: 'POST', body: JSON.stringify(seller) });
+export const setAdminSellerStatus = (seller: Seller, status: Seller['status']) => request<Seller>(`/api/admin/sellers/${encodeURIComponent(seller.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedStatus: seller.status }) });
 
 // ---- Admin catalog ----
 export const adminCreateProduct = (product: Partial<Product>) =>
-  request<Product>('/api/admin/products', { method: 'POST', body: JSON.stringify(product) });
+  request<Product>('/api/products', { method: 'POST', body: JSON.stringify({ sku: product.sku, name: product.name, nameAr: product.nameAr, descriptionEn: product.descriptionEn, descriptionAr: product.descriptionAr, priceMinor: product.priceMinor, currency: product.currency ?? 'USD', stock: product.availableStock ?? 0, categoryId: product.categoryId }) });
 export const adminUpdateProduct = (sku: string, product: Partial<Product>) =>
-  request<Product>(`/api/admin/products/${sku}`, { method: 'PUT', body: JSON.stringify(product) });
+  request<Product>(`/api/products/${encodeURIComponent(sku)}`, { method: 'PUT', body: JSON.stringify({ name: product.name, priceMinor: product.priceMinor, currency: product.currency ?? 'USD', categoryId: product.categoryId ?? null, expectedVersion: product.version ?? 0 }) });
+export const archiveAdminProduct = (product: Product) => request<void>(`/api/products/${encodeURIComponent(product.sku)}?expectedVersion=${product.version ?? 0}`, { method: 'DELETE' });
+export const adjustAdminStock = (product: Product, delta: number, reason: string) => request<Product>(`/api/products/${encodeURIComponent(product.sku)}/stock`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ delta, expectedVersion: product.version ?? 0, reason }) });
 
 // ---- Moyasar payments ----
 export const initiateMoyasarPayment = (body: MoyasarInitiateRequest) =>

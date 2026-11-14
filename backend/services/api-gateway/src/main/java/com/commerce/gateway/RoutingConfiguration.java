@@ -30,7 +30,7 @@ class RoutingConfiguration {
                         .uri("lb://user-service"))
                 .route("users", route -> route.path("/api/users/**")
                         .filters(filters -> resilient(filters, "users", authenticatedUserKeyResolver)).uri("lb://user-service"))
-                .route("products", route -> route.path("/api/products/**", "/api/cart/**", "/api/categories/**", "/api/admin/products/**", "/api/admin/categories/**")
+                .route("products", route -> route.path("/api/products/**", "/api/cart/**", "/api/categories/**", "/api/admin/products/**", "/api/admin/categories/**", "/api/admin/sellers/**")
                         .filters(filters -> resilient(filters, "products", authenticatedUserKeyResolver)).uri("lb://product-service"))
                 .route("orders", route -> route.path("/api/orders/**", "/api/admin/orders/**", "/api/admin/analytics/orders", "/api/delivery/**", "/api/admin/delivery/**", "/api/admin/shipments/**")
                         .filters(filters -> resilient(filters, "orders", authenticatedUserKeyResolver)).uri("lb://order-service"))

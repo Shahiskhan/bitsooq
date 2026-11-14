@@ -27,6 +27,7 @@ function hasStaffClaim() {
 
 export default function AdminGate() {
   // This is a navigation guard only; the API gateway remains authoritative for every admin request.
-  if (!hasStaffClaim()) return <Navigate to="/" replace />;
+  const demoPreview = import.meta.env.VITE_USE_MOCK === 'true';
+  if (!demoPreview && !hasStaffClaim()) return <Navigate to="/" replace />;
   return <Suspense fallback={<main className="admin-loading"><LoaderCircle className="animate-spin" size={23} /><span>Loading workspace</span></main>}><div className="admin-workspace"><Dashboard /></div></Suspense>;
 }

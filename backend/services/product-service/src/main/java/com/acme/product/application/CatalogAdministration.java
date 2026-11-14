@@ -12,6 +12,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class CatalogAdministration {
     public record Category(String id,String name,long version,boolean active) { }
+    public record Seller(String id,String ownerUserId,String displayName,String legalName,String slug,String email,String phone,String countryCode,String taxRegistrationNumber,String status,java.time.Instant createdAt,java.time.Instant updatedAt) { }
     private final JdbcTemplate db; private final CatalogService catalog; private final ObjectMapper json;
     public CatalogAdministration(JdbcTemplate db,CatalogService catalog,ObjectMapper json) {this.db=db;this.catalog=catalog;this.json=json;}
     public List<Category> categories() {return db.query("SELECT id,name,version,active FROM category WHERE active=TRUE ORDER BY id",(rs,n)->new Category(rs.getString(1),rs.getString(2),rs.getLong(3),rs.getBoolean(4)));}
@@ -20,6 +21,10 @@ public class CatalogAdministration {
     @Transactional public Category updateCategory(String id,String name,long version,boolean active) {if(db.update("UPDATE category SET name=?,active=?,version=version+1 WHERE id=? AND version=?",name,active,id,version)!=1)throw conflict();return category(id);}
     public List<Product> products(String after,int size) {return db.query("SELECT * FROM product WHERE sku>? ORDER BY sku LIMIT ?",CatalogService.PRODUCT_MAPPER,after,size);}
     public Product product(String sku) {return db.query("SELECT * FROM product WHERE sku=?",CatalogService.PRODUCT_MAPPER,sku).stream().findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not found"));}
+    public List<Seller> sellers(int size) {return db.query("SELECT id,owner_user_id,display_name,legal_name,slug,email,phone,country_code,tax_registration_number,status,created_at,updated_at FROM seller ORDER BY created_at DESC,id DESC LIMIT ?",(rs,n)->new Seller(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7),rs.getString(8),rs.getString(9),rs.getString(10),rs.getTimestamp(11).toInstant(),rs.getTimestamp(12).toInstant()),size);}
+    public Seller seller(String id) {return db.query("SELECT id,owner_user_id,display_name,legal_name,slug,email,phone,country_code,tax_registration_number,status,created_at,updated_at FROM seller WHERE id=?",(rs,n)->new Seller(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7),rs.getString(8),rs.getString(9),rs.getString(10),rs.getTimestamp(11).toInstant(),rs.getTimestamp(12).toInstant()),id).stream().findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Seller not found"));}
+    @Transactional public Seller createSeller(String owner,String name,String legal,String slug,String email,String phone,String country,String taxNumber) {String id=UUID.randomUUID().toString();db.update("INSERT INTO seller(id,owner_user_id,display_name,legal_name,slug,email,phone,country_code,tax_registration_number,status) VALUES(?,?,?,?,?,?,?,?,?,'PENDING')",id,owner,name,legal,slug,email,phone,country,taxNumber);return seller(id);}
+    @Transactional public Seller changeSellerStatus(String id,String status,String expectedStatus) {if(db.update("UPDATE seller SET status=? WHERE id=? AND status=?",status,id,expectedStatus)!=1)throw conflict();return seller(id);}
     @Transactional public Product update(String sku,String name,long price,String currency,String category,long version) {
         requireCategory(category);
         if(db.update("UPDATE product SET name=?,price_minor=?,currency=?,category_id=?,version=version+1 WHERE sku=? AND version=? AND active=TRUE",name,price,currency,category,sku,version)!=1) throw conflict();
