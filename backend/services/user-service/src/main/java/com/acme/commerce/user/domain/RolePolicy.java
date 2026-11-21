@@ -8,10 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 public final class RolePolicy {
     private RolePolicy() {}
-    private static final Set<String> ALLOWED=Set.of("USER","STAFF","SUPER_ADMIN");
+    private static final Set<String> ALLOWED=Set.of("USER","STAFF","SUPER_ADMIN","PRODUCT_MANAGER","STORE_MANAGER","FULFILLMENT_MANAGER");
     public static List<String> normalize(Collection<String> requested) {
-        if(requested==null || requested.isEmpty() || requested.size()>3 || requested.stream().anyMatch(role->role==null || !ALLOWED.contains(role)))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Roles must contain USER, STAFF or SUPER_ADMIN");
+        if(requested==null || requested.isEmpty() || requested.size()>6 || requested.stream().anyMatch(role->role==null || !ALLOWED.contains(role)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Roles must be selected from USER, STAFF, SUPER_ADMIN, PRODUCT_MANAGER, STORE_MANAGER and FULFILLMENT_MANAGER");
         var roles=new TreeSet<>(requested); roles.add("USER"); return List.copyOf(roles);
     }
     public static List<String> fromClaims(Map<String,Object> claims) {

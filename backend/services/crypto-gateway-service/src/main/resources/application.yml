@@ -45,6 +45,7 @@ security:
 crypto:
   rpc-url: ${CRYPTO_RPC_URL}
   merchant-wallet: ${CRYPTO_MERCHANT_WALLET}
+  token-contracts: ${CRYPTO_TOKEN_CONTRACTS:{}}
   beta-enabled: ${CRYPTO_BETA_ENABLED:false}
 management:
   endpoints:

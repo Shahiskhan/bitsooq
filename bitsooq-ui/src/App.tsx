@@ -9,6 +9,7 @@ import Storefront from './pages/Storefront';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import OrderTracking from './pages/OrderTracking';
+import Login from './pages/Login';
 import { CartProvider } from './lib/store';
 import Footer from './components/Footer';
 
@@ -60,6 +61,7 @@ export default function App() {
       <ScrollManager />
       <Routes>
         <Route path="/admin/*" element={<AdminGate />} />
+        <Route path="/login" element={<Login />} />
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<StorefrontRoute />} />
           <Route path="/product/:sku" element={<ProductDetailRoute />} />

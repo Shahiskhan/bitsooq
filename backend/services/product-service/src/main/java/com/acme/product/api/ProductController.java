@@ -37,7 +37,7 @@ public class ProductController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Product create(@Valid @RequestBody CreateProduct request, HttpServletRequest servlet) {
-        com.acme.product.security.AdminAccess.requireStaff(servlet);
+        com.acme.product.security.AdminAccess.requireCatalog(servlet);
         return catalog.create(new Product(request.sku(), request.name(), request.nameAr(), request.descriptionEn(), request.descriptionAr(), request.priceMinor(), request.currency(), request.stock(), request.categoryId(), 0, true));
     }
 }

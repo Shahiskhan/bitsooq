@@ -2,14 +2,19 @@ package com.bitsooq.moyasar;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.client.RestClient;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -33,12 +38,20 @@ public class PaymentIntents {
     private final TransactionTemplate tx;
     private final MoyasarClient moyasar;
     private final ObjectMapper json;
+    private final RestClient orderService;
+    private final byte[] internalSecret;
 
-    public PaymentIntents(JdbcTemplate db, TransactionTemplate tx, MoyasarClient moyasar, ObjectMapper json) {
+    public PaymentIntents(JdbcTemplate db, TransactionTemplate tx, MoyasarClient moyasar, ObjectMapper json,
+            RestClient.Builder builder,
+            @org.springframework.beans.factory.annotation.Value("${commerce.internal-secret}") String internalSecret,
+            @org.springframework.beans.factory.annotation.Value("${commerce.order-service-url:http://order-service:8083}") String orderServiceUrl) {
         this.db = db;
         this.tx = tx;
         this.moyasar = moyasar;
         this.json = json;
+        this.orderService = builder.baseUrl(orderServiceUrl).build();
+        this.internalSecret = internalSecret.getBytes(StandardCharsets.UTF_8);
+        if (this.internalSecret.length < 32) throw new IllegalStateException("Internal context key must be at least 32 bytes");
     }
 
     /**
@@ -46,9 +59,30 @@ public class PaymentIntents {
      * persists provider state.
      */
     public JsonNode initiate(String userId, InitiateRequest request) {
+        JsonNode order = fetchOwnedOrder(userId, request.orderId());
+        long amount = order.path("totalMinor").asLong(-1);
+        String currency = order.path("currency").asText("");
+        if (amount <= 0 || currency.isBlank())
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not ready for payment");
+        if (request.amountHalalas() != amount || !request.currency().equals(currency))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment amount or currency does not match the order");
+        var existing = db.queryForList(
+                "SELECT order_id,amount_minor,currency,moyasar_payment_id,status FROM moyasar_payment WHERE user_id=? AND idempotency_key=?",
+                userId, request.idempotencyKey());
+        if (!existing.isEmpty()) {
+            var row = existing.getFirst();
+            if (!request.orderId().equals(row.get("order_id").toString())
+                    || ((Number) row.get("amount_minor")).longValue() != amount
+                    || !currency.equals(row.get("currency")))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was used for a different payment");
+            String providerId = (String) row.get("moyasar_payment_id");
+            if (providerId == null)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment initiation is still being completed; retry shortly");
+            return paymentResponse(request.orderId(), providerId, (String) row.get("status"), moyasar.fetchPayment(providerId));
+        }
         var source = json.createObjectNode().put("type", request.source());
-        JsonNode created = moyasar.createPayment(Long.toString(request.amountHalalas()), request.currency(),
-                "BitSooq order " + request.orderId(), request.callbackUrl(), source);
+        JsonNode created = moyasar.createPayment(Long.toString(amount), currency,
+                "BitSooq order " + request.orderId(), request.callbackUrl(), source, request.idempotencyKey());
         String moyasarId = created.path("id").asText(null);
         if (moyasarId == null)
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Moyasar did not return a payment id");
@@ -64,13 +98,44 @@ public class PaymentIntents {
                     created.path("status").asText("initiated"), moyasarId, request.callbackUrl(),
                     request.idempotencyKey(),
                     Timestamp.from(Instant.now()));
-            return json.createObjectNode()
-                    .put("orderId", request.orderId())
-                    .put("paymentId", moyasarId)
-                    .put("status", created.path("status").asText())
-                    .put("redirectUrl", created.path("source").path("transaction_url").asText(null))
-                    .<ObjectNode>set("provider", created);
+            return paymentResponse(request.orderId(), moyasarId, created.path("status").asText("initiated"), created);
         });
+    }
+
+    private JsonNode paymentResponse(String orderId, String paymentId, String status, JsonNode provider) {
+        return json.createObjectNode()
+                .put("orderId", orderId)
+                .put("paymentId", paymentId)
+                .put("status", status)
+                .put("redirectUrl", provider.path("source").path("transaction_url").asText(null))
+                .<ObjectNode>set("provider", provider);
+    }
+
+    private JsonNode fetchOwnedOrder(String userId, String orderId) {
+        String path = "/api/orders/" + orderId;
+        String timestamp = Long.toString(Instant.now().getEpochSecond());
+        String requestId = UUID.randomUUID().toString();
+        String roles = "USER";
+        String canonical = String.join("\n", "GET", path, userId, roles, timestamp, requestId);
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(internalSecret, "HmacSHA256"));
+            String signature = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
+            JsonNode order = orderService.get().uri(path)
+                    .header("X-Internal-User-Id", userId)
+                    .header("X-Internal-Roles", roles)
+                    .header("X-Internal-Timestamp", timestamp)
+                    .header("X-Internal-Request-Id", requestId)
+                    .header("X-Internal-Signature", signature)
+                    .retrieve().body(JsonNode.class);
+            if (order == null) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Order service returned no data");
+            return order;
+        } catch (ResponseStatusException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to verify order with order service", failure);
+        }
     }
 
     /**

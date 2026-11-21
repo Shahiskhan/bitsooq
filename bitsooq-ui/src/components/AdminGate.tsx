@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { LoaderCircle } from 'lucide-react';
 
@@ -19,15 +19,16 @@ function hasStaffClaim() {
     };
     const roleValues = [claims.roles, claims.role, claims.authorities].flatMap((value) => Array.isArray(value) ? value : value ? [value] : []);
     const roles = roleValues.map((value) => String(value).toUpperCase());
-    return claims.admin === true || roles.some((role) => ['ADMIN', 'ROLE_ADMIN', 'STAFF', 'ROLE_STAFF', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN'].includes(role));
+    return claims.admin === true || roles.some((role) => ['ADMIN', 'ROLE_ADMIN', 'STAFF', 'ROLE_STAFF', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN', 'PRODUCT_MANAGER', 'ROLE_PRODUCT_MANAGER', 'STORE_MANAGER', 'ROLE_STORE_MANAGER', 'FULFILLMENT_MANAGER', 'ROLE_FULFILLMENT_MANAGER'].includes(role));
   } catch {
     return false;
   }
 }
 
 export default function AdminGate() {
+  const location = useLocation();
   // This is a navigation guard only; the API gateway remains authoritative for every admin request.
   const demoPreview = import.meta.env.VITE_USE_MOCK === 'true';
-  if (!demoPreview && !hasStaffClaim()) return <Navigate to="/" replace />;
+  if (!demoPreview && !hasStaffClaim()) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return <Suspense fallback={<main className="admin-loading"><LoaderCircle className="animate-spin" size={23} /><span>Loading workspace</span></main>}><div className="admin-workspace"><Dashboard /></div></Suspense>;
 }

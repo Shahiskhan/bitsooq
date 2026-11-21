@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminUserController {
     private final AdminRoleService service;
     public AdminUserController(AdminRoleService service) { this.service=service; }
-    public record ChangeRoles(@NotEmpty @Size(max=3) List<@NotNull @Pattern(regexp="USER|STAFF|SUPER_ADMIN") String> roles) {}
+    public record ChangeRoles(@NotEmpty @Size(max=6) List<@NotNull @Pattern(regexp="USER|STAFF|SUPER_ADMIN|PRODUCT_MANAGER|STORE_MANAGER|FULFILLMENT_MANAGER") String> roles) {}
     private static Set<String> roles(HttpServletRequest request) { return Arrays.stream(((String)request.getAttribute("roles")).split(",")).collect(Collectors.toSet()); }
     private static String actor(HttpServletRequest request) { return (String)request.getAttribute("userId"); }
     @GetMapping public UserDirectory.DirectoryPage list(HttpServletRequest request,@RequestParam(required=false) @Size(max=2048) String cursor,@RequestParam(defaultValue="20") @Min(1) @Max(100) int size) {

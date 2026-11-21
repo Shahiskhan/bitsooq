@@ -39,14 +39,15 @@ public class MoyasarClient {
      * id, status, url).
      */
     public JsonNode createPayment(String amountHalalas, String currency, String description,
-            String callbackUrl, JsonNode source) {
+            String callbackUrl, JsonNode source, String idempotencyKey) {
         var body = json.createObjectNode()
                 .put("amount", amountHalalas)
                 .put("currency", currency)
                 .put("description", description)
                 .put("callback_url", callbackUrl);
         body.set("source", source);
-        return http.post().uri("/payments").body(body).retrieve().body(JsonNode.class);
+        return http.post().uri("/payments").header("Idempotency-Key", idempotencyKey)
+                .body(body).retrieve().body(JsonNode.class);
     }
 
     /** Authoritative fetch of a payment; used before trusting webhook status. */

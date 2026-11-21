@@ -32,9 +32,14 @@ It creates separate logical databases (`user`, `product`, `order`, `payment`, `n
 
 See [`backend/README.md`](backend/README.md) for the complete Docker Compose stack, service configuration, and verification commands. You do not need to run that stack to browse the sample storefront.
 
+## Admin and manager workspaces
+
+The interactive demo also includes a read-only dashboard preview at `/admin`. It uses sample PKR data so the overview, orders, product catalog, mini stores, delivery setup, and analytics can be reviewed without running services. For a live dashboard, configure Firebase email/password sign-in plus a valid operator role; see [`docs/ADMIN-OPERATIONS.md`](docs/ADMIN-OPERATIONS.md) for local setup, role assignment, API routes, and production deployment guidance.
+
 ## Domain and deployment notes
 
 - [`docs/ecommerce-domain.md`](docs/ecommerce-domain.md) describes the expanded catalog, order, tax, fulfillment, customer-address, and payment data model and its migration boundaries.
 - [`backend/docs/operations.md`](backend/docs/operations.md) lists production readiness work. The repository contains integration seams and schemas; it does not claim live Pakistan tax filing, live COD, shipping-carrier, JazzCash/Easypaisa, or production payment processing is configured.
+- [`docs/ADMIN-OPERATIONS.md`](docs/ADMIN-OPERATIONS.md) documents admin sign-in, manager scopes, fulfillment controls, analytics data, API contracts, and go-live limits.
 
 The live API supports customer address book, delivery-zone quotes, configurable delivery rates, order address snapshots, COD due/collection, staff shipment milestones, tracking references, ETA, and shipment activity. Delivery zones and rates must be configured by staff before live checkout can quote delivery. Live catalog/order currency remains USD; local demo prices/rates are PKR examples and never submit real orders. No carrier account or automatic courier booking/label purchase is configured. Moyasar requires valid provider credentials and callbacks; crypto remains disabled by default. Never use sample catalog data or local credentials for real orders.

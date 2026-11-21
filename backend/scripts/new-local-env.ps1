@@ -26,8 +26,9 @@ if (!(Test-Path -LiteralPath $backendTarget)) {
     $lines = @('FIREBASE_PROJECT_ID=replace-with-your-project-id', "INTERNAL_HMAC_SECRET=$(New-Secret)", 'CONFIG_USERNAME=config', "CONFIG_PASSWORD=$(New-Secret)", 'EUREKA_USERNAME=discovery', "EUREKA_PASSWORD=$(New-Secret)", "MYSQL_ROOT_PASSWORD=$(New-Secret)", "USER_DB_PASSWORD=$(New-Secret)", "PRODUCT_DB_PASSWORD=$(New-Secret)", "ORDER_DB_PASSWORD=$(New-Secret)", "PAYMENT_DB_PASSWORD=$(New-Secret)", "NOTIFICATION_DB_PASSWORD=$(New-Secret)", "REDIS_PASSWORD=$(New-Secret)")
     [System.IO.File]::WriteAllLines($backendTarget, $lines)
 }
-$frontendEnv = Join-Path $repositoryRoot 'frontend/.env.local'
-if (!(Test-Path -LiteralPath $frontendEnv)) { Copy-Item -LiteralPath (Join-Path $repositoryRoot 'frontend/.env.example') -Destination $frontendEnv }
+$frontendRoot = Join-Path $repositoryRoot 'bitsooq-ui'
+$frontendEnv = Join-Path $frontendRoot '.env.local'
+if (!(Test-Path -LiteralPath $frontendEnv)) { Copy-Item -LiteralPath (Join-Path $frontendRoot '.env.example') -Destination $frontendEnv }
 if (!(Test-Path -LiteralPath $rootTarget)) {
     $backendValues = Read-EnvFile $backendTarget
     $frontendValues = Read-EnvFile $frontendEnv

@@ -63,8 +63,10 @@ public class SecurityConfiguration {
                 .authorizeExchange(auth -> auth.pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
                         .pathMatchers("/api/admin/users/**", "/api/admin/analytics/**").hasRole("SUPER_ADMIN")
-                        .pathMatchers("/api/admin/orders/**", "/api/admin/products/**", "/api/admin/categories/**", "/api/admin/sellers/**", "/api/admin/delivery/**", "/api/admin/shipments/**").hasAnyRole("STAFF", "SUPER_ADMIN")
-                        .pathMatchers("/api/products/**", "/api/categories/**").hasAnyRole("STAFF", "SUPER_ADMIN")
+                        .pathMatchers("/api/admin/sellers/**").hasAnyRole("STORE_MANAGER", "STAFF", "SUPER_ADMIN")
+                        .pathMatchers("/api/admin/orders/**", "/api/admin/delivery/**", "/api/admin/shipments/**").hasAnyRole("FULFILLMENT_MANAGER", "STAFF", "SUPER_ADMIN")
+                        .pathMatchers("/api/admin/products/**", "/api/admin/categories/**").hasAnyRole("PRODUCT_MANAGER", "STAFF", "SUPER_ADMIN")
+                        .pathMatchers("/api/products/**", "/api/categories/**").hasAnyRole("PRODUCT_MANAGER", "STAFF", "SUPER_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/payments/orders/**").authenticated()
                         // Moyasar webhook: unauthenticated by design; verification happens via an
                         // authoritative re-fetch of the payment from the Moyasar API inside the service.
@@ -86,7 +88,7 @@ public class SecurityConfiguration {
         if (customRoles instanceof Collection<?> claims) {
             claims.stream().filter(String.class::isInstance).map(String.class::cast)
                     .map(role -> role.equals("ADMIN") ? "STAFF" : role)
-                    .filter(role -> List.of("SUPER_ADMIN", "STAFF", "USER").contains(role)).forEach(roles::add);
+                    .filter(role -> List.of("SUPER_ADMIN", "STAFF", "USER", "PRODUCT_MANAGER", "STORE_MANAGER", "FULFILLMENT_MANAGER").contains(role)).forEach(roles::add);
         }
         return new JwtAuthenticationToken(token, roles.stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList());
     }

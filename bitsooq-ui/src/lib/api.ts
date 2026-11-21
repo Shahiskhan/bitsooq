@@ -1,3 +1,5 @@
+import { getFirebaseAccessToken } from './auth';
+
 /**
  * API client. All requests go through the API Gateway, which handles JWT
  * validation, rate limiting and routing to the backing microservices.
@@ -11,14 +13,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getFirebaseAccessToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       // Firebase ID token attached by the auth layer when a session exists.
-      ...(sessionStorage.getItem('bitsooq.token')
-        ? { Authorization: `Bearer ${sessionStorage.getItem('bitsooq.token')}` }
-        : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -98,6 +99,9 @@ export interface AdminAnalytics {
   cancelledOrders: number;
   confirmedRevenueMinor: number;
   currency: string;
+  daily?: Array<{ date: string; orders: number; confirmedRevenueMinor: number }>;
+  statuses?: Array<{ status: string; count: number }>;
+  payments?: Array<{ method: string; paymentStatus: string; orders: number; amountMinor: number }>;
 }
 
 export interface AdminUser {
@@ -119,6 +123,7 @@ export interface Seller {
   countryCode: string;
   taxRegistrationNumber?: string | null;
   status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -214,13 +219,32 @@ export interface MoyasarIntent {
 // ---- Catalog (public) ----
 export const getProducts = () => request<Product[]>('/api/products');
 export const getCategories = () => request<Category[]>('/api/categories');
-export const getAdminProducts = () => request<Product[]>('/api/admin/products?size=100');
+export const getAdminProducts = (after = '') => request<Product[]>(`/api/admin/products?size=100${after ? `&after=${encodeURIComponent(after)}` : ''}`);
 
 // ---- Orders ----
 export const getOrders = (after?: string) => request<OrderPage>(`/api/orders?size=20${after ? `&after=${encodeURIComponent(after)}` : ''}`);
 export const getAdminOrders = (after?: string, status?: string) => request<OrderPage>(`/api/admin/orders?size=20${after ? `&after=${encodeURIComponent(after)}` : ''}${status ? `&status=${encodeURIComponent(status)}` : ''}`);
-export interface AdminOrderDetail extends OrderSummary { items: Array<{ sku: string; quantity: number }> }
+export interface AdminOrderDetail extends OrderSummary {
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
+  paymentReferenceId?: string | null;
+  subtotalMinor?: number | null;
+  shippingMinor?: number | null;
+  shippingMethodCode?: string | null;
+  shippingAddress?: ShippingAddress | null;
+  shipment?: Shipment | null;
+  items: Array<{ sku: string; quantity: number }>;
+}
+export interface ShipmentUpdate {
+  status: string;
+  carrierCode?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  description?: string;
+  location?: string;
+}
 export const getAdminOrder = (id: string) => request<AdminOrderDetail>(`/api/admin/orders/${encodeURIComponent(id)}`);
+export const updateAdminShipment = (id: string, update: ShipmentUpdate) => request<void>(`/api/admin/shipments/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(update) });
 export const getAdminAnalytics = () => request<AdminAnalytics>('/api/admin/analytics/orders');
 export const getAdminUsers = (cursor?: string) => request<{ users: AdminUser[]; nextCursor: string | null }>(`/api/admin/users?size=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
 export const updateAdminUserRoles = (uid: string, roles: string[]) => request<{ uid: string; roles: string[] }>(`/api/admin/users/${encodeURIComponent(uid)}/roles`, { method: 'PUT', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ roles }) });
@@ -250,14 +274,14 @@ export const createDeliveryRate = (zoneId: string, rate: Pick<DeliveryRate, 'met
 export const setDeliveryZoneActive = (id: string, active: boolean) => request<DeliveryZone>(`/api/admin/delivery/zones/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ active }) });
 export const setDeliveryRateActive = (id: string, active: boolean) => request<DeliveryRate>(`/api/admin/delivery/rates/${encodeURIComponent(id)}/active`, { method: 'PATCH', body: JSON.stringify({ active }) });
 export const getAdminSellers = () => request<Seller[]>('/api/admin/sellers?size=100');
-export const createAdminSeller = (seller: Omit<Seller, 'id' | 'status' | 'createdAt' | 'updatedAt'>) => request<Seller>('/api/admin/sellers', { method: 'POST', body: JSON.stringify(seller) });
-export const setAdminSellerStatus = (seller: Seller, status: Seller['status']) => request<Seller>(`/api/admin/sellers/${encodeURIComponent(seller.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedStatus: seller.status }) });
+export const createAdminSeller = (seller: Omit<Seller, 'id' | 'status' | 'version' | 'createdAt' | 'updatedAt'>) => request<Seller>('/api/admin/sellers', { method: 'POST', body: JSON.stringify(seller) });
+export const setAdminSellerStatus = (seller: Seller, status: Seller['status']) => request<Seller>(`/api/admin/sellers/${encodeURIComponent(seller.id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedStatus: seller.status, expectedVersion: seller.version }) });
 
 // ---- Admin catalog ----
 export const adminCreateProduct = (product: Partial<Product>) =>
   request<Product>('/api/products', { method: 'POST', body: JSON.stringify({ sku: product.sku, name: product.name, nameAr: product.nameAr, descriptionEn: product.descriptionEn, descriptionAr: product.descriptionAr, priceMinor: product.priceMinor, currency: product.currency ?? 'USD', stock: product.availableStock ?? 0, categoryId: product.categoryId }) });
 export const adminUpdateProduct = (sku: string, product: Partial<Product>) =>
-  request<Product>(`/api/products/${encodeURIComponent(sku)}`, { method: 'PUT', body: JSON.stringify({ name: product.name, priceMinor: product.priceMinor, currency: product.currency ?? 'USD', categoryId: product.categoryId ?? null, expectedVersion: product.version ?? 0 }) });
+  request<Product>(`/api/products/${encodeURIComponent(sku)}`, { method: 'PUT', body: JSON.stringify({ name: product.name, nameAr: product.nameAr, descriptionEn: product.descriptionEn, descriptionAr: product.descriptionAr, priceMinor: product.priceMinor, currency: product.currency ?? 'USD', categoryId: product.categoryId || null, expectedVersion: product.version ?? 0 }) });
 export const archiveAdminProduct = (product: Product) => request<void>(`/api/products/${encodeURIComponent(product.sku)}?expectedVersion=${product.version ?? 0}`, { method: 'DELETE' });
 export const adjustAdminStock = (product: Product, delta: number, reason: string) => request<Product>(`/api/products/${encodeURIComponent(product.sku)}/stock`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ delta, expectedVersion: product.version ?? 0, reason }) });
 

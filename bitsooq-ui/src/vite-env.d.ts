@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_FIREBASE_PROJECT_ID?: string;
+  readonly VITE_FIREBASE_API_KEY?: string;
   readonly VITE_CRYPTO_NETWORKS?: string;
   readonly VITE_CRYPTO_DEFAULT_NETWORK?: string;
   readonly VITE_MERCHANT_WALLET?: string;
